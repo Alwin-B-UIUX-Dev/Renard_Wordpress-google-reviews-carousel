@@ -1,0 +1,17 @@
+/* Style basique pour les blocs d'avis */
+.grc-reviews-carousel .grc-review {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 5px;
+    min-height: 120px;
+    box-shadow: 0 2px 5px rgba(50,50,50,.08);
+}
+.grc-reviews-carousel .grc-author {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+.grc-reviews-carousel .grc-rating {
+    color: #FFB400;
+    font-size: 16px;
+}
