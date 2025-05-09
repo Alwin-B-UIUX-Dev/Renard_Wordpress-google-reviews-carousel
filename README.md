@@ -44,4 +44,3 @@ MIT (or GPLv2 — update as appropriate for your project)
 
 ---
 
-> **Developed with ❤️ by [Alwin AKA Renard](https://github.com/Alwin-B-UIUX-Dev).**
