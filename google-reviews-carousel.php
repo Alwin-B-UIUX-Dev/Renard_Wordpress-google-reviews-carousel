@@ -31,6 +31,36 @@ function grc_add_admin_menu()
         'grc_options_page'
     );
 }
+// Charger le CSS/JS Slick et les styles de l'aperçu uniquement sur la page de réglages du plugin
+add_action('admin_enqueue_scripts', function($hook) {
+    if ( $hook === 'settings_page_google-reviews-carousel') { // Ce HOOK correspond à ta page d’options
+        // Charger Slick Carousel et ton CSS preview
+        wp_enqueue_style('slick-carousel', 'https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css');
+        wp_enqueue_script('slick-carousel', 'https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js', ['jquery'], '1.8.1', true);
+
+        // CSS rapide pour l’aperçu admin
+        wp_add_inline_style('slick-carousel', "
+            #grc-admin-preview-wrap { border:1px solid #ddd; padding:20px 30px 24px 30px; background:#fafbfd; border-radius:9px; margin-bottom:35px; max-width:650px; }
+            #grc-admin-carousel-preview { padding:14px 10px; border-radius:9px; min-height:120px; }
+            .grc-review { border-radius:7px; margin: 0px 8px; padding:16px 19px; display:flex; flex-direction:column; align-items:left; }
+            .grc-author { font-weight:bold; margin-bottom: 4px;}
+            .grc-rating { font-size:21px; letter-spacing:1px; }
+            .grc-text { font-size:inherit; margin:8px 0 ;}
+            .grc-date { color:#999;font-size:12px; }
+        ");
+        // JS qui initialise le carousel preview
+        wp_add_inline_script('slick-carousel', "
+            jQuery(function( $ ) {
+                $('#grc-admin-carousel-preview').not('.slick-initialized').slick({
+                    slidesToShow: 1,
+                    autoplay: true,
+                    dots: true,
+                    arrows: false
+                });
+            });
+        ");
+    }
+});
 
 
 // ==== 3. Init & sanitization des paramètres et champs admin ====
@@ -55,7 +85,8 @@ function grc_options_sanitize($options)
         unset($options['grc_card_shadow_custom']);
     }
     $options['grc_dots_color'] = isset($options['grc_dots_color']) && preg_match('/^#[a-f0-9]{6}$/i', $options['grc_dots_color']) ? $options['grc_dots_color'] : '#000000';
-    $options['grc_dots_size'] = isset($options['grc_dots_size']) ? max(5, min(20, intval($options['grc_dots_size']))) : 10;    $options['grc_active_dots_color'] = isset($options['grc_active_dots_color']) && preg_match('/^#[a-f0-9]{6}$/i', $options['grc_active_dots_color']) ? $options['grc_active_dots_color'] : '#0073aa';
+    $options['grc_dots_size'] = isset($options['grc_dots_size']) ? max(5, min(20, intval($options['grc_dots_size']))) : 10;
+    $options['grc_active_dots_color'] = isset($options['grc_active_dots_color']) && preg_match('/^#[a-f0-9]{6}$/i', $options['grc_active_dots_color']) ? $options['grc_active_dots_color'] : '#0073aa';
     return $options;
 }
 
@@ -466,29 +497,91 @@ function grc_active_dots_color_render()
 
 
 // ==== 4. Génération de la page d’options ====
-function grc_options_page()
-{
-?>
+function grc_options_page() {
+    // 1. Récupérer les options
+    $options = get_option('grc_options');
+
+    // 2. Données d’aperçu fictives (pour visualiser le rendu du carousel même sans avis réel)
+    $dummy_reviews = [
+        [
+            'author_name' => 'Alice',
+            'profile_photo_url' => '',
+            'rating' => 5,
+            'text' => __('Super expérience, je recommande vivement !', 'google-reviews-carousel'),
+            'time' => time(),
+        ],
+        [
+            'author_name' => 'Bob',
+            'profile_photo_url' => '',
+            'rating' => 4,
+            'text' => __('Bon accueil, avis positif !', 'google-reviews-carousel'),
+            'time' => time() - 86400,
+        ],
+        [
+            'author_name' => 'Charlie',
+            'profile_photo_url' => '',
+            'rating' => 3,
+            'text' => __('Service correct, un peu d\'attente.', 'google-reviews-carousel'),
+            'time' => time() - 172800,
+        ],
+    ];
+
+    // 3. Préparer les variables
+    $txt_size      = intval($options['grc_text_size'] ?? 16);
+    $show_stars    = !empty($options['grc_show_stars']);
+    $show_photo    = !empty($options['grc_show_photo']);
+    $bg            = $options['grc_color_bg'] ?? '#fff';
+    $color         = $options['grc_color_txt'] ?? '#222';
+    $stars_color   = $options['grc_stars_color'] ?? '#ffc107';
+    $card_bg_color = $options['grc_card_bg_color'] ?? '#fff';
+    $card_border   = ($options['grc_card_border_width'] ?? 1) . 'px '
+                   . ($options['grc_card_border_style'] ?? 'solid') . ' '
+                   . ($options['grc_card_border_color'] ?? '#e0e0e0');
+    $card_shadow   = $options['grc_card_shadow'] ?? '0 2px 12px rgba(0,0,0,0.12)';
+    ?>
     <div class="wrap">
         <h1><?php esc_html_e('Google Reviews Carousel', 'google-reviews-carousel'); ?></h1>
-        <form action="options.php" method="post">
+
+        <!-- Formulaire options WP -->
+        <form method="post" action="options.php">
             <?php
-            settings_fields('grc_settings');
-            do_settings_sections('google-reviews-carousel');
-            submit_button();
+                settings_fields('grc_settings');
+                do_settings_sections('google-reviews-carousel');
+                submit_button();
             ?>
-            <hr>
-            <h2><?php esc_html_e('Options par défaut', 'google-reviews-carousel'); ?></h2>
-            <p>
-                <input type="submit" name="grc_reset_options" class="button button-secondary" value="<?php esc_attr_e('Réinitialiser les options', 'google-reviews-carousel'); ?>" onclick="return confirm('<?php esc_attr_e('Êtes-vous sûr de vouloir réinitialiser les options aux valeurs par défaut ?', 'google-reviews-carousel'); ?>');" />
-            </p>
         </form>
+
         <hr>
-        <h2><?php esc_html_e('Aperçu (à intégrer via le shortcode [grc_google_reviews])', 'google-reviews-carousel'); ?></h2>
-        <p><em><?php esc_html_e('L\'aperçu en live arrivera bientôt ! En attendant, utilisez le shortcode sur une page ou un article.', 'google-reviews-carousel'); ?></em></p>
+        <h2><?php esc_html_e('Aperçu du carousel', 'google-reviews-carousel'); ?></h2>
+        <div id="grc-admin-preview-wrap">
+            <div id="grc-admin-carousel-preview" class="grc-reviews-carousel" style="background: <?php echo esc_attr($bg); ?>;">
+                <?php foreach ($dummy_reviews as $review): ?>
+                    <div class="grc-review"
+                        style="
+                            font-size: <?php echo esc_attr($txt_size); ?>px;
+                            background: <?php echo esc_attr($card_bg_color); ?>;
+                            color: <?php echo esc_attr($color); ?>;
+                            border: <?php echo esc_attr($card_border); ?>;
+                            box-shadow: <?php echo esc_attr($card_shadow); ?>;
+                            margin-bottom:16px;
+                        ">
+                        <div class="grc-author"><?php echo esc_html($review['author_name']); ?></div>
+                        <?php if ($show_stars): ?>
+                            <div class="grc-rating" style="color:<?php echo esc_attr($stars_color); ?>">
+                                <?php for ($i = 1; $i <= 5; $i++) { echo ($i <= $review['rating']) ? '★' : '☆'; } ?>
+                            </div>
+                        <?php endif; ?>
+                        <div class="grc-text"><?php echo esc_html($review['text']); ?></div>
+                        <div class="grc-date"><small><?php echo date_i18n('d/m/Y', $review['time']); ?></small></div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <small><?php esc_html_e('Aperçu instantané selon vos réglages actuels.', 'google-reviews-carousel'); ?></small>
     </div>
-<?php
+    <?php
 }
+
 add_action('admin_init', 'grc_handle_reset_options');
 
 function grc_handle_reset_options()
